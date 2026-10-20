@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>My Baby Birthday Quest</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+        
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+
+        body {
+            font-family: 'Press Start 2P', monospace;
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow: hidden;
+        }
+
+        /* RPG Maker / Pokémon MMO Frame Style */
+        .rpg-frame {
+            border: 6px solid #334155;
+            box-shadow: inset 0 0 0 2px #64748b, 0 0 0 4px #0f172a, 0 12px 30px rgba(0, 0, 0, 0.8);
+            border-radius: 10px;
+        }
+
+        .rpg-dialog {
+            background: linear-gradient(to bottom, #1e293b 0%, #0f172a 100%);
+            border: 3px solid #64748b;
+            box-shadow: inset 0 0 0 2px #334155, 0 6px 16px rgba(0,0,0,0.6);
+            border-radius: 6px;
+            color: #f8fafc;
+        }
+
+        canvas {
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+
+        @keyframes floatUp {
+            0% { transform: translateY(0) scale(0.7) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(-70px) scale(1.4) rotate(15deg); opacity: 0; }
+        }
+
+        .floating-heart {
+            position: absolute;
+            animation: floatUp 1.6s ease-out forwards;
+            pointer-events: none;
+        }
+
+        @keyframes pulseArrow {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(4px); }
+        }
+
+        .pulse-arrow {
+            animation: pulseArrow 0.6s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-between h-screen w-screen p-2 sm:p-4 bg-slate-950">
+
+    <!-- Top MMO Status / Health Bar HUD -->
+    <header class="w-full max-w-2xl flex justify-between items-center px-4 py-2 bg-slate-900 rounded-t-lg border-x-2 border-t-2 border-slate-700 z-10 shadow-md">
+        <div class="flex items-center space-x-3">
+            <div class="flex flex-col">
+                <span id="map-title-hud" class="text-[9px] sm:text-[11px] text-yellow-400 font-bold tracking-wider">🌲 AYAH FOREST</span>
+                <div class="w-28 sm:w-36 h-2.5 bg-slate-800 rounded-full border border-slate-600 mt-1 overflow-hidden">
+                    <div id="hp-bar" class="h-full bg-emerald-500 w-full transition-all"></div>
+                </div>
+            </div>
+        </div>
+        <div class="flex items-center space-x-3">
+            <span id="quest-counter" class="text-[9px] sm:text-[10px] text-pink-400 font-bold">💖 Bataan: 0/6</span>
+            <button id="sound-btn" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-[8px] text-sky-300 rounded border border-slate-600 transition">🔊 Sound: ON</button>
+        </div>
+    </header>
+
+    <!-- Game Viewport Container -->
+    <main class="relative w-full max-w-2xl flex-1 flex flex-col items-center justify-center">
+        <div id="canvas-container" class="relative w-full aspect-[4/3] max-h-[68vh] rpg-frame bg-slate-900 rounded-b-lg overflow-hidden flex items-center justify-center">
+            
+            <!-- Main Game Canvas -->
+            <canvas id="gameCanvas" width="640" height="480" class="w-full h-full object-contain cursor-pointer"></canvas>
+
+            <!-- Floating Hearts & Sparkles Effect Layer -->
+            <div id="heart-layer" class="absolute inset-0 pointer-events-none overflow-hidden z-25"></div>
+
+            <!-- Start Game Overlay -->
+            <div id="start-screen" class="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center z-30">
+                <div class="text-3xl mb-2 animate-bounce">🏡💖</div>
+                <h2 class="text-xs sm:text-base text-yellow-400 mb-2 tracking-wide font-bold">✨ LITTLE MARIAH BIRTHDAY ADVENTURE ✨</h2>
+                <p class="text-[9px] sm:text-[10px] text-slate-300 max-w-md mb-4 leading-relaxed">
+                    hELLo my babyy, its your birthday naaaAaaaaAaaaaaaaa, walk around lang ikaw may mga pinadala ako dyan na bataan para iremind ka how much i love youuu :3 blehhhh.
+                </p>
+                <div class="bg-slate-900 p-3 rounded-lg border border-slate-700 mb-5 text-[8px] sm:text-[9px] text-slate-300 text-left space-y-1">
+                    <p>🎮 <strong>Move:</strong> WASD / Arrow Keys / On-screen D-Pad</p>
+                    <p>💬 <strong>Talk / Enter Door:</strong> Spacebar / Enter / On-screen 'A' button</p>
+                    <p>✨ <strong>Warp Zones:</strong> Step directly onto doorsteps to enter/exit homes!</p>
+                </div>
+                <button id="start-btn" class="px-6 py-3 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold rounded-lg border-2 border-blue-400 shadow-xl transition transform hover:scale-105 active:scale-95">
+                    START ADVENTURE 🚀
+                </button>
+            </div>
+
+            <!-- RPG Maker / MMO Style Dialogue Box -->
+            <div id="dialog-overlay" class="absolute bottom-2 left-2 right-2 rpg-dialog p-3 hidden z-30">
+                <div class="flex items-center justify-between mb-1 border-b border-slate-700 pb-1">
+                    <span id="dialog-speaker" class="text-[9px] sm:text-[10px] text-yellow-300 font-bold tracking-wider">FRIEND</span>
+                    <span class="text-[7px] text-slate-400">[PRESS A / SPACE]</span>
+                </div>
+                <p id="dialog-text" class="text-[9px] sm:text-[10px] text-slate-100 leading-relaxed min-h-[36px] font-mono"></p>
+                
+                <!-- Polaroid Memory Photo Container -->
+                <div id="dialog-image-container" class="hidden mt-2 flex justify-center">
+                    <div class="p-1 bg-slate-900 border-2 border-slate-600 rounded shadow-md">
+                        <img id="dialog-image" src="" alt="Birthday Memory" class="max-h-32 rounded object-contain bg-slate-800" onerror="this.src='https://placehold.co/300x200/1e293b/38bdf8?text=Sweet+Birthday+Memory'">
+                    </div>
+                </div>
+
+                <div class="flex justify-end mt-1">
+                    <span id="dialog-arrow" class="text-yellow-400 text-xs font-bold pulse-arrow hidden">▼</span>
+                </div>
+            </div>
+
+            <!-- Final Celebration Ending Screen -->
+            <div id="ending-screen" class="absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-4 text-center hidden z-40 overflow-y-auto">
+                <div class="text-3xl mb-1 animate-bounce">🎉🎂💖</div>
+                <h2 class="text-xs sm:text-base text-yellow-300 mb-1 font-bold">💖 HAPPY BIRTHDAY, BABY KO MARIAHHHH! 💖</h2>
+                <p id="ending-subtitle" class="text-[8px] sm:text-[9px] text-emerald-400 mb-3">Wala na nakausap mo na lahat ng mga bataan kooooooo!</p>
+                
+                <div id="ending-letter" class="bg-slate-900 border-2 border-pink-500 p-4 rounded-lg max-w-lg text-left text-[8px] sm:text-[9px] text-slate-200 space-y-2 shadow-2xl mb-4 max-h-[45vh] overflow-y-auto leading-relaxed">
+                    <!-- Letter populated dynamically -->
+                </div>
+
+                <button id="restart-btn" class="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-[10px] font-bold rounded transition border-2 border-emerald-200">
+                    PLAY AGAIN ✨
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom MMO Chat / Action Bar -->
+    <div class="w-full max-w-2xl bg-slate-900 rounded-b-lg border-x-2 border-b-2 border-slate-700 px-3 py-2 flex justify-between items-center z-10 shadow-md">
+        <!-- Directional D-Pad -->
+        <div class="grid grid-cols-3 gap-1 w-24 h-24 sm:w-28 sm:h-28 bg-slate-950 p-1.5 rounded-full border border-slate-700 shadow-inner">
+            <div></div>
+            <button id="btn-up" class="bg-slate-800 active:bg-blue-600 rounded-t-lg border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center">▲</button>
+            <div></div>
+            <button id="btn-left" class="bg-slate-800 active:bg-blue-600 rounded-l-lg border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center">◀</button>
+            <div class="bg-slate-900 rounded flex items-center justify-center text-[6px] text-slate-500">DPAD</div>
+            <button id="btn-right" class="bg-slate-800 active:bg-blue-600 rounded-r-lg border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center">▶</button>
+            <div></div>
+            <button id="btn-down" class="bg-slate-800 active:bg-blue-600 rounded-b-lg border border-slate-700 text-slate-200 text-xs font-bold flex items-center justify-center">▼</button>
+            <div></div>
+        </div>
+
+        <div class="flex-1 mx-3 hidden sm:flex items-center bg-slate-950 border border-slate-700 rounded px-3 py-1.5">
+            <span class="text-[8px] text-slate-400 mr-2">Say:</span>
+            <span class="text-[8px] text-emerald-400 animate-pulse">Walk right onto the red house doorstep to enter!</span>
+        </div>
+
+        <!-- Action Button A -->
+        <div class="flex flex-col items-center justify-center">
+            <button id="btn-action" class="w-16 h-16 sm:w-18 sm:h-18 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 rounded-full border-4 border-blue-400 text-white text-xs font-bold shadow-xl flex flex-col items-center justify-center transform active:scale-95">
+                <span class="text-sm font-black">A</span>
+                <span class="text-[6px] text-blue-100 tracking-tighter">TALK</span>
+            </button>
+        </div>
+    </div>
+
+    <script>
+        /* ====================================================================
+           GAME CONFIGURATION & MAPS (WITH EXPANDED WARP DOOR ZONES)
+           ==================================================================== */
+        const GAME_CONFIG = {
+            finalLetter: {
+                title: "💌 A Special Letter Just For You 💌",
+                paragraphs: [
+                    "My dearest baby,",
+                    "Each moment na mag isa ako kahit pa ilang hours lang dahil like wala power or internet, sobrang tahimik na agad ng mundo ko kaya sana alam mo how grateful i am sa bawat oras and minuto na nakakasama kita",
+                    "Sobrang napapasaya mo ako each day baby, sana happy ikaw dito sa litol game adventure chuchu ko ket papano :3",
+                    "Sayo lang ako forever my baby, more memories pa and time with you para next time isang buong series na ng game talaga ang pwede bleh, i love you so mcuh my baby"
+                ],
+                signature: "— Sayo lang po ako palagi^^ 💕"
+            },
+
+            maps: {
+                forest: {
+                    id: 'forest',
+                    name: '🌲 AYAH FOREST',
+                    bgColor: '#14532d',
+                    obstacles: [
+                        {x: 0, y: 0, w: 640, h: 32},
+                        {x: 0, y: 448, w: 640, h: 32},
+                        {x: 0, y: 0, w: 32, h: 480},
+                        {x: 608, y: 0, w: 32, h: 480},
+                        {x: 96, y: 96, w: 64, h: 64},
+                        {x: 480, y: 96, w: 64, h: 64},
+                        {x: 96, y: 320, w: 64, h: 64},
+                        {x: 480, y: 320, w: 64, h: 64}
+                    ],
+                    warps: [
+                        { x: 18 * 32, y: 7 * 32, targetMap: 'city', targetX: 2 * 32, targetY: 7 * 32, label: '🏙️ TO CITY' }
+                    ],
+                    npcs: [
+                        {
+                            id: 'npc1',
+                            name: 'One less Lonely Bai',
+                            x: 5 * 32,
+                            y: 4 * 32,
+                            classType: 'bugcatcher',
+                            direction: 'down',
+                            hasImage: false,
+                            dialogues: [
+                                "🌲 Happy Birthday Babyy! Thank you so much sa mga time and games na binibigay mo sakin everyday my baby, im really sorry if masyado kita napapalungkot these past days :( sana hindi nabawasan pagmamahal mo sakin kasi me kahit ilang iyak grrr super duper mahal na mahal parin ikaw :P",
+                                "Sana enjoy mo po birthday mo and wag itreat lang ng normal day kasi special man yan grrr! 🐛💛"
+                            ]
+                        },
+                        {
+                            id: 'npc2',
+                            name: 'Olivia Rodriguez',
+                            x: 14 * 32,
+                            y: 4 * 32,
+                            classType: 'lass',
+                            direction: 'left',
+                            hasImage: true,
+                            imageUrl: 'https://imgs.search.brave.com/f0GYL05xhWZOzU13DqXsvhFivW3-gP1hKKxkZ4eWZOw/rs:fit:860:0:0:0/g:ce/aHR0cDovL3d3dy5p/bXBhd2FyZHMuY29t/LzIwMjMvcG9zdGVy/cy9wYXN0X2xpdmVz/X3hsZy5qcGc',
+                            dialogues: [
+                                "Sabi sayo diba kapag nasasad me naalala ko yung mga early days natin, kaya wag na wag iisipin na iiwanan kita grrr, kahit gaano ako kalungkot baby hindi talaga pumasok sa isip ko yon hmp!",
+                                "Parang movie na 'to, sad and nakakaiyak sya pero everytime naaalala ko sya nareremind ako sa time na kinikilala palang kita and nagulat me noong bigla mo binanggit na pinanood mo sya and nagandahan ikaw, idk hindi man natin nawatch together pero naging special na sakin yung movie hehe"
+                            ]
+                        }
+                    ]
+                },
+                city: {
+                    id: 'city',
+                    name: '🏙️ NIGHT CITY',
+                    bgColor: '#334155',
+                    obstacles: [
+                        {x: 0, y: 0, w: 640, h: 32},
+                        {x: 0, y: 448, w: 640, h: 32},
+                        {x: 0, y: 0, w: 32, h: 480},
+                        {x: 608, y: 0, w: 32, h: 480},
+                        {x: 128, y: 64, w: 128, h: 96},   // Red Building
+                        {x: 384, y: 64, w: 128, h: 96},   // Purple Building
+                        {x: 160, y: 320, w: 96, h: 64},   // Bench 1
+                        {x: 384, y: 320, w: 96, h: 64}    // Bench 2
+                    ],
+                    warps: [
+                        { x: 1 * 32, y: 7 * 32, targetMap: 'forest', targetX: 17 * 32, targetY: 7 * 32, label: '🌲 TO FOREST' },
+                        { x: 18 * 32, y: 7 * 32, targetMap: 'park', targetX: 2 * 32, targetY: 7 * 32, label: '🌸 TO PARK' },
+                        // Generous doorstep warp zone for Red House door (x: 160 to 208, y: 140 to 164)
+                        { x: 160, y: 136, w: 64, h: 32, targetMap: 'house', targetX: 9 * 32, targetY: 11 * 32, label: '🏠 ENTER HOME' }
+                    ],
+                    npcs: [
+                        {
+                            id: 'npc3',
+                            name: 'Adili',
+                            x: 5 * 32,
+                            y: 10 * 32,
+                            classType: 'cooltrainer',
+                            direction: 'up',
+                            hasImage: true,
+                            imageUrl: 'https://cdn.discordapp.com/attachments/1471690045411823729/1491417678798393445/image.png?ex=6ad80a33&is=6ad6b8b3&hm=7de9814aca9e5b1851ae422337c51274eb2155ecbb595875384534f89d7bf354',
+                            dialogues: [
+                                "hehe naalala mo po yung axolotl courier natin na matchyyyy? ang cute nila parin hehe sila best courier for me",
+                                "yan oh dati palang wala talaga sakin if mag ano ako ng ganyan sayo kaya kurotin kita, pero ikaw una palang gusto palitan agad what if kurotin kita no? same lang baby sa crimson kaya please wag na isipin :((( hehe yan oh cute nilaaaaaaa first babies natin :3"
+                            ]
+                        },
+                        {
+                            id: 'npc4',
+                            name: 'Pingpong Princess',
+                            x: 14 * 32,
+                            y: 10 * 32,
+                            classType: 'nurse',
+                            direction: 'up',
+                            hasImage: false,
+                            dialogues: [
+                                "Sana wag mo baby pabayaan sarili mo, or alagaan ba, kung andyan lang ako sobrang tagal mo na nafeel na princess ikaw grrr pagsisilbihan talaga kitaaa, kaya for the mean time take care of yourself muna for me baby pweaseee",
+                                "Pag ikaw sad sa special day mo iiyak talaga ako and mag bed rot ng isang linggo :<, kaya dapat ienjoy mo baby pleasee hehe I WUV UUUUU"
+                            ]
+                        }
+                    ]
+                },
+                house: {
+                    id: 'house',
+                    name: '🏠 BAHAY NA WALANG SIGAWAN',
+                    bgColor: '#1e293b',
+                    obstacles: [
+                        {x: 0, y: 0, w: 640, h: 32},
+                        {x: 0, y: 448, w: 640, h: 32},
+                        {x: 0, y: 0, w: 32, h: 480},
+                        {x: 608, y: 0, w: 32, h: 480},
+                        {x: 96, y: 64, w: 128, h: 80},    // Bed & Nightstand
+                        {x: 416, y: 64, w: 128, h: 80},   // Bookshelf & Desk
+                        {x: 256, y: 256, w: 128, h: 64}   // Living room table
+                    ],
+                    warps: [
+                        // Exit warp zone at bottom door mat
+                        { x: 8 * 32, y: 13 * 32, w: 4 * 32, h: 32, targetMap: 'city', targetX: 176, targetY: 175, label: '🚪 EXIT HOME' }
+                    ],
+                    npcs: [
+                        {
+                            id: 'npc_house',
+                            name: 'Gaben',
+                            x: 9 * 32,
+                            y: 5 * 32,
+                            classType: 'beauty',
+                            direction: 'down',
+                            hasImage: true,
+                            imageUrl: 'https://imgs.search.brave.com/8106ezf6hGjDRSXSun-FDHGFkdyYOI4i6vcHKf9xd-U/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9tZWRp/YS50ZW5vci5jb20v/eWk0dHJUV0g1SGtB/QUFBTS9wdXBweS1l/eWVzLXJhdC5naWY.gif',
+                            dialogues: [
+                                "Looking forward parin ako everyday sa mga games and time na maspend ko with you :3 more movies more series together pa bleh bahala ka talaga bawal ikaw maumay sakin",
+                                "Gusto pa kita makilala babyyyy up until now, mas makilala pa kaya if may mga want ikaw or yung interest mo talaga na mga bagay wag ikaw mag hesitate magsabi pleaseee"
+                            ]
+                        }
+                    ]
+                },
+                park: {
+                    id: 'park',
+                    name: '🌸 AYAH PARK',
+                    bgColor: '#166534',
+                    obstacles: [
+                        {x: 0, y: 0, w: 640, h: 32},
+                        {x: 0, y: 448, w: 640, h: 32},
+                        {x: 0, y: 0, w: 32, h: 480},
+                        {x: 608, y: 0, w: 32, h: 480},
+                        {x: 256, y: 160, w: 128, h: 96},  // Gazebo
+                        {x: 160, y: 320, w: 96, h: 64},   // Flower Bench 1
+                        {x: 384, y: 320, w: 96, h: 64}    // Flower Bench 2
+                    ],
+                    warps: [
+                        { x: 1 * 32, y: 7 * 32, targetMap: 'city', targetX: 17 * 32, targetY: 7 * 32, label: '🏙️ TO CITY' }
+                    ],
+                    npcs: [
+                        {
+                            id: 'npc5',
+                            name: 'Elfie',
+                            x: 5 * 32,
+                            y: 10 * 32,
+                            classType: 'beauty',
+                            direction: 'up',
+                            hasImage: true,
+                            imageUrl: 'https://imgs.search.brave.com/xyE-PPTAQdY40O8OW6dxuJISUQj1KOJoZ0h7nLyw6OY/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9naWZk/Yi5jb20vaW1hZ2Vz/L3RodW1ibmFpbC9j/dXRlLWxvdmUta2lz/c2VzLWZvci15b3Ut/dXVqYnVva3p5b3Ax/OWU0dy5naWY.gif',
+                            dialogues: [
+                                "Im forever grateful to have you in my life babyyyy, wala ako pinagsisihan kita once or makaisip ng ganon bagayyy, if masasad ako alam mo naman na i care too much sayo kaya ganon reaction ko most of the time pero hindi naman ibig sabihin non nagregret ako sa mga naging choices ko no grrr",
+                                "Kung babalik man time, gagawin ko lahat ng mga bagay and decisions na nagawa ko na nag lead sakin lahat para makilala ikaw kasi sobrang saya ko simula nakilala kitaaa and sana ikaw din po."
+                            ]
+                        },
+                        {
+                            id: 'npc6',
+                            name: 'Rosty',
+                            x: 14 * 32,
+                            y: 10 * 32,
+                            classType: 'professor',
+                            direction: 'up',
+                            hasImage: true,
+                            imageUrl: 'https://cdn.discordapp.com/attachments/1471690045411823729/1507002443198890056/image.jpg?ex=6ad80c25&is=6ad6baa5&hm=19b8844dbc41d1cb50d3aaa989fc558cb0cd6a86b879fabde9ac8366abc3747e',
+                            dialogues: [
+                                "I love you so much my beautiful girllllll, bawal gloomy haaaaa, kiss nalang kita if malungkot ka ng ilang minutessss",
+                                "If sad magagalit si rosty kaya dapat and nakaka panget raw pag malungkot kaya waggggggg, tignan mo ganda ganda mo oh, dapat ba umiiyak ganyan kaganda? hindi poooo, oh diba hindi daw kaya bawal saddddd grrrr hehe i love you baby ko"
+                            ]
+                        }
+                    ]
+                }
+            }
+        };
+
+        /* ====================================================================
+           AUDIO ENGINE
+           ==================================================================== */
+        class RetroAudioEngine {
+            constructor() {
+                this.ctx = null;
+                this.enabled = true;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.ctx.state === 'suspended') {
+                    this.ctx.resume();
+                }
+            }
+
+            playTone(freq, type, duration, vol = 0.08) {
+                if (!this.enabled) return;
+                this.init();
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type;
+                    osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + duration);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start();
+                    osc.stop(this.ctx.currentTime + duration);
+                } catch (e) {}
+            }
+
+            playTextBleep() {
+                this.playTone(650 + Math.random() * 100, 'sine', 0.04, 0.03);
+            }
+
+            playStepSFX() {
+                this.playTone(180 + Math.random() * 30, 'triangle', 0.05, 0.015);
+            }
+
+            playInteractionChime() {
+                this.playTone(880, 'sine', 0.08, 0.08);
+                setTimeout(() => this.playTone(1318.51, 'sine', 0.15, 0.08), 80);
+            }
+
+            playWarpSound() {
+                this.playTone(523.25, 'sine', 0.1, 0.1);
+                setTimeout(() => this.playTone(659.25, 'sine', 0.1, 0.1), 80);
+                setTimeout(() => this.playTone(783.99, 'sine', 0.15, 0.1), 160);
+            }
+
+            playFanfare() {
+                const notes = [523.25, 659.25, 783.99, 1046.50, 1318.51, 1567.98];
+                notes.forEach((freq, idx) => {
+                    setTimeout(() => this.playTone(freq, 'sine', 0.25, 0.1), idx * 120);
+                });
+            }
+        }
+
+        const audio = new RetroAudioEngine();
+
+        /* ====================================================================
+           GAME ENGINE & CANVAS SETUP
+           ==================================================================== */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const TILE = 32;
+        const MAP_COLS = 20;
+        const MAP_ROWS = 15;
+
+        let gameState = 'START';
+        let currentMapKey = 'forest';
+        let activeKeys = {};
+        let touchDirs = { up: false, down: false, left: false, right: false };
+        let visitedNPCs = new Set();
+        let activeNPC = null;
+        
+        let totalNPCsCount = 0;
+        Object.values(GAME_CONFIG.maps).forEach(m => totalNPCsCount += m.npcs.length);
+
+        let currentDialogText = '';
+        let fullDialogText = '';
+        let dialogCharIdx = 0;
+        let dialogTimer = null;
+        let isTyping = false;
+        let dialogPhase = 0;
+
+        const player = {
+            x: 9 * TILE,
+            y: 7 * TILE,
+            speed: 2.5,
+            dir: 'down',
+            animFrame: 0,
+            animTimer: 0,
+            isMoving: false
+        };
+
+        /* ====================================================================
+           CONTROLS BINDINGS
+           ==================================================================== */
+        window.addEventListener('keydown', (e) => {
+            const k = e.key.toLowerCase();
+            activeKeys[k] = true;
+            activeKeys[e.code] = true;
+
+            if ([' ', 'enter', 'space'].includes(k) || e.code === 'Space') {
+                e.preventDefault();
+                handleActionTrigger();
+            }
+
+            if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(k)) {
+                e.preventDefault();
+            }
+        });
+
+        window.addEventListener('keyup', (e) => {
+            const k = e.key.toLowerCase();
+            activeKeys[k] = false;
+            activeKeys[e.code] = false;
+        });
+
+        function bindTouchBtn(btnId, direction) {
+            const btn = document.getElementById(btnId);
+            const start = (e) => {
+                e.preventDefault();
+                touchDirs[direction] = true;
+                audio.init();
+            };
+            const end = (e) => {
+                e.preventDefault();
+                touchDirs[direction] = false;
+            };
+            btn.addEventListener('touchstart', start);
+            btn.addEventListener('touchend', end);
+            btn.addEventListener('mousedown', start);
+            btn.addEventListener('mouseup', end);
+        }
+
+        bindTouchBtn('btn-up', 'up');
+        bindTouchBtn('btn-down', 'down');
+        bindTouchBtn('btn-left', 'left');
+        bindTouchBtn('btn-right', 'right');
+
+        document.getElementById('btn-action').addEventListener('click', (e) => {
+            e.preventDefault();
+            audio.init();
+            handleActionTrigger();
+        });
+
+        document.getElementById('start-btn').addEventListener('click', () => {
+            audio.init();
+            document.getElementById('start-screen').classList.add('hidden');
+            gameState = 'PLAYING';
+            document.getElementById('quest-counter').textContent = `💖 Memories: 0/${totalNPCsCount}`;
+        });
+
+        document.getElementById('restart-btn').addEventListener('click', () => {
+            visitedNPCs.clear();
+            currentMapKey = 'forest';
+            document.getElementById('map-title-hud').textContent = GAME_CONFIG.maps.forest.name;
+            document.getElementById('quest-counter').textContent = `💖 Memories: 0/${totalNPCsCount}`;
+            document.getElementById('ending-screen').classList.add('hidden');
+            player.x = 9 * TILE;
+            player.y = 7 * TILE;
+            gameState = 'PLAYING';
+        });
+
+        document.getElementById('sound-btn').addEventListener('click', () => {
+            audio.enabled = !audio.enabled;
+            document.getElementById('sound-btn').textContent = audio.enabled ? '🔊 Sound: ON' : '🔇 Sound: OFF';
+        });
+
+        function handleActionTrigger() {
+            if (gameState === 'START') {
+                document.getElementById('start-btn').click();
+                return;
+            }
+
+            if (gameState === 'PLAYING') {
+                const mapData = GAME_CONFIG.maps[currentMapKey];
+                const npc = findNearbyNPC(mapData.npcs);
+                if (npc) {
+                    startDialog(npc);
+                }
+            } else if (gameState === 'DIALOG') {
+                advanceDialog();
+            }
+        }
+
+        function findNearbyNPC(npcs) {
+            const talkDist = 42;
+            return npcs.find(npc => {
+                const dx = (player.x + 12) - (npc.x + 16);
+                const dy = (player.y + 12) - (npc.y + 16);
+                return Math.sqrt(dx * dx + dy * dy) < talkDist;
+            });
+        }
+
+        function startDialog(npc) {
+            gameState = 'DIALOG';
+            activeNPC = npc;
+            dialogPhase = 0;
+            
+            const dx = player.x - npc.x;
+            const dy = player.y - npc.y;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                npc.direction = dx > 0 ? 'right' : 'left';
+            } else {
+                npc.direction = dy > 0 ? 'down' : 'up';
+            }
+
+            audio.playInteractionChime();
+
+            if (!visitedNPCs.has(npc.id)) {
+                visitedNPCs.add(npc.id);
+                document.getElementById('quest-counter').textContent = `💖 Memories: ${visitedNPCs.size}/${totalNPCsCount}`;
+                spawnFloatingHearts(npc.x + 16, npc.y);
+            }
+
+            document.getElementById('dialog-speaker').textContent = npc.name;
+            document.getElementById('dialog-overlay').classList.remove('hidden');
+
+            renderCurrentDialogLine();
+        }
+
+        function renderCurrentDialogLine() {
+            if (!activeNPC) return;
+            const text = activeNPC.dialogues[dialogPhase];
+            fullDialogText = text;
+            currentDialogText = '';
+            dialogCharIdx = 0;
+            isTyping = true;
+            document.getElementById('dialog-arrow').classList.add('hidden');
+
+            const imgContainer = document.getElementById('dialog-image-container');
+            const imgEl = document.getElementById('dialog-image');
+            if (activeNPC.hasImage && dialogPhase === 1) {
+                imgEl.src = activeNPC.imageUrl;
+                imgContainer.classList.remove('hidden');
+            } else {
+                imgContainer.classList.add('hidden');
+            }
+
+            clearInterval(dialogTimer);
+            dialogTimer = setInterval(() => {
+                if (dialogCharIdx < fullDialogText.length) {
+                    currentDialogText += fullDialogText[dialogCharIdx];
+                    document.getElementById('dialog-text').textContent = currentDialogText;
+                    if (dialogCharIdx % 2 === 0) audio.playTextBleep();
+                    dialogCharIdx++;
+                } else {
+                    isTyping = false;
+                    clearInterval(dialogTimer);
+                    document.getElementById('dialog-arrow').classList.remove('hidden');
+                }
+            }, 30);
+        }
+
+        function advanceDialog() {
+            if (isTyping) {
+                clearInterval(dialogTimer);
+                currentDialogText = fullDialogText;
+                document.getElementById('dialog-text').textContent = fullDialogText;
+                isTyping = false;
+                document.getElementById('dialog-arrow').classList.remove('hidden');
+                return;
+            }
+
+            dialogPhase++;
+            if (dialogPhase < activeNPC.dialogues.length) {
+                renderCurrentDialogLine();
+            } else {
+                document.getElementById('dialog-overlay').classList.add('hidden');
+                gameState = 'PLAYING';
+
+                if (visitedNPCs.size >= totalNPCsCount) {
+                    setTimeout(triggerEndingCelebration, 500);
+                }
+            }
+        }
+
+        function triggerEndingCelebration() {
+            gameState = 'ENDING';
+            audio.playFanfare();
+
+            const letter = GAME_CONFIG.finalLetter;
+            const endingEl = document.getElementById('ending-letter');
+            endingEl.innerHTML = `
+                <h3 class="text-[10px] sm:text-xs text-yellow-300 font-bold mb-2">${letter.title}</h3>
+                ${letter.paragraphs.map(p => `<p class="mb-2 text-slate-200">${p}</p>`).join('')}
+                <p class="text-right text-pink-400 font-bold mt-3">${letter.signature}</p>
+            `;
+
+            document.getElementById('ending-screen').classList.remove('hidden');
+
+            for (let i = 0; i < 25; i++) {
+                setTimeout(() => {
+                    spawnFloatingHearts(
+                        Math.random() * window.innerWidth,
+                        Math.random() * window.innerHeight + 100
+                    );
+                }, i * 90);
+            }
+        }
+
+        function spawnFloatingHearts(x, y) {
+            const layer = document.getElementById('heart-layer');
+            const heart = document.createElement('div');
+            heart.className = 'floating-heart text-base sm:text-xl';
+            heart.textContent = ['💖', '✨', '🌸', '🎀', '⭐', '💌', '🏡'][Math.floor(Math.random() * 7)];
+            heart.style.left = `${x}px`;
+            heart.style.top = `${y}px`;
+            layer.appendChild(heart);
+            setTimeout(() => heart.remove(), 1600);
+        }
+
+        /* ====================================================================
+           MOVEMENT & COLLISION (WITH ROBUST WARP DETECTION)
+           ==================================================================== */
+        function updatePlayerMovement() {
+            if (gameState !== 'PLAYING') return;
+
+            let dx = 0;
+            let dy = 0;
+
+            if (activeKeys['w'] || activeKeys['arrowup'] || touchDirs.up) { dy -= 1; player.dir = 'up'; }
+            if (activeKeys['s'] || activeKeys['arrowdown'] || touchDirs.down) { dy += 1; player.dir = 'down'; }
+            if (activeKeys['a'] || activeKeys['arrowleft'] || touchDirs.left) { dx -= 1; player.dir = 'left'; }
+            if (activeKeys['d'] || activeKeys['arrowright'] || touchDirs.right) { dx += 1; player.dir = 'right'; }
+
+            if (dx !== 0 || dy !== 0) {
+                player.isMoving = true;
+                
+                if (dx !== 0 && dy !== 0) {
+                    dx *= 0.7071;
+                    dy *= 0.7071;
+                }
+
+                const nextX = player.x + dx * player.speed;
+                const nextY = player.y + dy * player.speed;
+
+                const mapData = GAME_CONFIG.maps[currentMapKey];
+
+                if (!checkCollision(nextX, player.y, mapData)) player.x = nextX;
+                if (!checkCollision(player.x, nextY, mapData)) player.y = nextY;
+
+                checkWarpTriggers(mapData);
+
+                player.animTimer++;
+                if (player.animTimer % 10 === 0) {
+                    player.animFrame = (player.animFrame + 1) % 4;
+                    audio.playStepSFX();
+                }
+            } else {
+                player.isMoving = false;
+                player.animFrame = 0;
+            }
+        }
+
+        function checkCollision(px, py, mapData) {
+            const pBox = { x: px + 4, y: py + 12, w: 20, h: 16 };
+
+            for (let obs of mapData.obstacles) {
+                if (pBox.x < obs.x + obs.w &&
+                    pBox.x + pBox.w > obs.x &&
+                    pBox.y < obs.y + obs.h &&
+                    pBox.y + pBox.h > obs.y) {
+                    return true;
+                }
+            }
+
+            for (let npc of mapData.npcs) {
+                const nBox = { x: npc.x + 4, y: npc.y + 8, w: 24, h: 20 };
+                if (pBox.x < nBox.x + nBox.w &&
+                    pBox.x + pBox.w > nBox.x &&
+                    pBox.y < nBox.y + nBox.h &&
+                    pBox.y + pBox.h > nBox.y) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        function checkWarpTriggers(mapData) {
+            const pBox = { x: player.x + 8, y: player.y + 16, w: 16, h: 16 };
+            for (let warp of mapData.warps) {
+                const wWidth = warp.w || 32;
+                const wHeight = warp.h || 32;
+                if (pBox.x < warp.x + wWidth &&
+                    pBox.x + pBox.w > warp.x &&
+                    pBox.y < warp.y + wHeight &&
+                    pBox.y + pBox.h > warp.y) {
+                    
+                    audio.playWarpSound();
+                    currentMapKey = warp.targetMap;
+                    player.x = warp.targetX;
+                    player.y = warp.targetY;
+                    document.getElementById('map-title-hud').textContent = GAME_CONFIG.maps[currentMapKey].name;
+                    break;
+                }
+            }
+        }
+
+        /* ====================================================================
+           MAP RENDERING
+           ==================================================================== */
+        function renderMap() {
+            if (currentMapKey === 'forest') renderForestMap();
+            else if (currentMapKey === 'city') renderCityMap();
+            else if (currentMapKey === 'park') renderParkMap();
+            else if (currentMapKey === 'house') renderHouseInterior();
+        }
+
+        function renderForestMap() {
+            for (let r = 0; r < MAP_ROWS; r++) {
+                for (let c = 0; c < MAP_COLS; c++) {
+                    ctx.fillStyle = (r + c) % 2 === 0 ? '#14532d' : '#166534';
+                    ctx.fillRect(c * TILE, r * TILE, TILE, TILE);
+                }
+            }
+            drawStonePath(8 * TILE, 0, 4 * TILE, 15 * TILE);
+
+            drawDetailedTree(96, 96);
+            drawDetailedTree(480, 96);
+            drawDetailedTree(96, 320);
+            drawDetailedTree(480, 320);
+
+            drawWarpSign(18 * 32, 7 * 32, '🏙️');
+        }
+
+        function renderCityMap() {
+            for (let r = 0; r < MAP_ROWS; r++) {
+                for (let c = 0; c < MAP_COLS; c++) {
+                    ctx.fillStyle = (r + c) % 2 === 0 ? '#cbd5e1' : '#94a3b8';
+                    ctx.fillRect(c * TILE, r * TILE, TILE, TILE);
+                }
+            }
+
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(0, 5 * TILE, 20 * TILE, 5 * TILE);
+            ctx.fillStyle = '#facc15';
+            for (let x = 0; x < 20 * TILE; x += 64) {
+                ctx.fillRect(x + 16, 7 * TILE - 2, 32, 4);
+            }
+
+            drawRPGBuilding(128, 64, 128, 96, '#dc2626', '#fef2f2');
+            drawRPGBuilding(384, 64, 128, 96, '#7c3aed', '#f5f3ff');
+
+            drawRPGWorkbench(160, 320, 96, 64);
+            drawRPGWorkbench(384, 320, 96, 64);
+
+            drawWarpSign(0, 7 * 32, '🌲');
+            drawWarpSign(18 * 32, 7 * 32, '🌸');
+        }
+
+        function renderParkMap() {
+            for (let r = 0; r < MAP_ROWS; r++) {
+                for (let c = 0; c < MAP_COLS; c++) {
+                    ctx.fillStyle = (r + c) % 2 === 0 ? '#15803d' : '#16a34a';
+                    ctx.fillRect(c * TILE, r * TILE, TILE, TILE);
+                }
+            }
+            drawStonePath(8 * TILE, 0, 4 * TILE, 15 * TILE);
+            drawStonePath(0, 6 * TILE, 20 * TILE, 3 * TILE);
+
+            ctx.fillStyle = '#0284c7';
+            ctx.fillRect(256, 160, 128, 96);
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillRect(272, 176, 96, 64);
+
+            drawRPGWorkbench(160, 320, 96, 64);
+            drawRPGWorkbench(384, 320, 96, 64);
+
+            drawWarpSign(0, 7 * 32, '🏙️');
+        }
+
+        function renderHouseInterior() {
+            for (let r = 0; r < MAP_ROWS; r++) {
+                for (let c = 0; c < MAP_COLS; c++) {
+                    ctx.fillStyle = (r + c) % 2 === 0 ? '#3b2219' : '#4a2c1f';
+                    ctx.fillRect(c * TILE, r * TILE, TILE, TILE);
+                }
+            }
+
+            ctx.fillStyle = '#881337';
+            ctx.fillRect(5 * TILE, 4 * TILE, 10 * TILE, 6 * TILE);
+            ctx.strokeStyle = '#fda4af';
+            ctx.strokeRect(5 * TILE, 4 * TILE, 10 * TILE, 6 * TILE);
+
+            // Bed
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(96, 64, 128, 80);
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillRect(112, 80, 96, 48);
+
+            // Bookshelf & Desk
+            ctx.fillStyle = '#451a03';
+            ctx.fillRect(416, 64, 128, 80);
+            ctx.fillStyle = '#fde047';
+            for (let bx = 432; bx < 520; bx += 16) {
+                ctx.fillRect(bx, 80, 10, 24);
+            }
+
+            // Coffee Table
+            ctx.fillStyle = '#92400e';
+            ctx.fillRect(256, 256, 128, 64);
+            ctx.fillStyle = '#fbcfe8';
+            ctx.fillRect(300, 276, 16, 16);
+
+            // Door mat exit
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillRect(8 * TILE, 13 * TILE, 4 * TILE, TILE);
+            ctx.fillStyle = '#0f172a';
+            ctx.font = '8px monospace';
+            ctx.fillText('EXIT 🚪', 8.5 * TILE, 13.7 * TILE);
+        }
+
+        function drawStonePath(x, y, w, h) {
+            ctx.fillStyle = '#94a3b8';
+            ctx.fillRect(x, y, w, h);
+            ctx.fillStyle = '#64748b';
+            for (let px = x; px < x + w; px += 16) {
+                for (let py = y; py < y + h; py += 16) {
+                    if ((px + py) % 32 === 0) ctx.fillRect(px, py, 14, 14);
+                }
+            }
+        }
+
+        function drawRPGBuilding(x, y, w, h, roofColor, wallColor) {
+            ctx.fillStyle = roofColor;
+            ctx.fillRect(x, y, w, 32);
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(x + w / 2 - 16, y - 8, 32, 12);
+            ctx.fillStyle = wallColor;
+            ctx.fillRect(x, y + 32, w, h - 32);
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(x + w / 2 - 16, y + h - 48, 32, 48);
+            ctx.fillStyle = '#38bdf8';
+            ctx.fillRect(x + 16, y + 48, 24, 28);
+            ctx.fillRect(x + w - 40, y + 48, 24, 28);
+        }
+
+        function drawRPGWorkbench(x, y, w, h) {
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(x, y, w, 16);
+            ctx.fillStyle = '#92400e';
+            ctx.fillRect(x, y + 16, w, 24);
+            ctx.fillStyle = '#451a03';
+            ctx.fillRect(x + 6, y + 40, 8, 16);
+            ctx.fillRect(x + w - 14, y + 40, 8, 16);
+        }
+
+        function drawDetailedTree(x, y) {
+            ctx.fillStyle = '#543820';
+            ctx.fillRect(x + 24, y + 40, 16, 24);
+            ctx.fillStyle = '#14532d';
+            ctx.fillRect(x + 4, y + 16, 56, 32);
+            ctx.fillStyle = '#166534';
+            ctx.fillRect(x + 8, y + 8, 48, 32);
+            ctx.fillStyle = '#22c55e';
+            ctx.fillRect(x + 12, y + 0, 40, 28);
+        }
+
+        function drawWarpSign(x, y, icon) {
+            const bob = Math.sin(Date.now() / 200) * 4;
+            ctx.fillStyle = '#78350f';
+            ctx.fillRect(x + 12, y + 16, 8, 16);
+            ctx.fillStyle = '#fef08a';
+            ctx.fillRect(x + 4, y + 4 + bob, 24, 16);
+            ctx.strokeStyle = '#334155';
+            ctx.strokeRect(x + 4, y + 4 + bob, 24, 16);
+            ctx.font = '10px monospace';
+            ctx.fillText(icon, x + 8, y + 16 + bob);
+        }
+
+        function drawPlayerSprite() {
+            const x = player.x;
+            const y = player.y;
+
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(x + 12, y + 26, 10, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            const bounce = player.isMoving && (player.animFrame % 2 === 1) ? -2 : 0;
+
+            ctx.fillStyle = '#2563eb';
+            ctx.fillRect(x + 4, y + 10 + bounce, 16, 12);
+            ctx.fillStyle = '#3b82f6';
+            ctx.fillRect(x + 6, y + 12 + bounce, 12, 10);
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(x + 7, y + 20 + bounce, 10, 6);
+            ctx.fillStyle = '#fde047';
+            ctx.fillRect(x + 6, y + 2 + bounce, 12, 8);
+            ctx.fillStyle = '#ffdbac';
+            ctx.fillRect(x + 7, y + 4 + bounce, 10, 7);
+            ctx.fillStyle = '#1d4ed8';
+            ctx.fillRect(x + 5, y + 0 + bounce, 14, 5);
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(x + 9, y + 2 + bounce, 6, 2);
+
+            ctx.fillStyle = '#0f172a';
+            if (player.dir === 'down') {
+                ctx.fillRect(x + 8, y + 7 + bounce, 2, 2);
+                ctx.fillRect(x + 14, y + 7 + bounce, 2, 2);
+            } else if (player.dir === 'left') {
+                ctx.fillRect(x + 7, y + 7 + bounce, 2, 2);
+            } else if (player.dir === 'right') {
+                ctx.fillRect(x + 15, y + 7 + bounce, 2, 2);
+            }
+        }
+
+        function drawNPCSprites() {
+            const mapData = GAME_CONFIG.maps[currentMapKey];
+            mapData.npcs.forEach(npc => {
+                const x = npc.x;
+                const y = npc.y;
+
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.beginPath();
+                ctx.ellipse(x + 12, y + 26, 10, 5, 0, 0, Math.PI * 2);
+                ctx.fill();
+
+                let shirtColor = '#ec4899';
+                if (npc.classType === 'cooltrainer') shirtColor = '#3b82f6';
+                if (npc.classType === 'professor') shirtColor = '#e2e8f0';
+                if (npc.classType === 'nurse') shirtColor = '#f43f5e';
+                if (npc.classType === 'beauty') shirtColor = '#ec4899';
+
+                ctx.fillStyle = shirtColor;
+                ctx.fillRect(x + 6, y + 12, 12, 10);
+                ctx.fillStyle = '#334155';
+                ctx.fillRect(x + 7, y + 20, 10, 6);
+                ctx.fillStyle = '#ffdbac';
+                ctx.fillRect(x + 7, y + 4, 10, 8);
+                ctx.fillStyle = shirtColor;
+                ctx.fillRect(x + 5, y + 1, 14, 5);
+
+                ctx.fillStyle = '#0f172a';
+                if (npc.direction === 'down') {
+                    ctx.fillRect(x + 8, y + 7, 2, 2);
+                    ctx.fillRect(x + 14, y + 7, 2, 2);
+                } else if (npc.direction === 'left') {
+                    ctx.fillRect(x + 7, y + 7, 2, 2);
+                } else if (npc.direction === 'right') {
+                    ctx.fillRect(x + 15, y + 7, 2, 2);
+                }
+
+                const dx = (player.x + 12) - (x + 12);
+                const dy = (player.y + 12) - (y + 12);
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < 42 && gameState === 'PLAYING') {
+                    const bob = Math.sin(Date.now() / 150) * 3;
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(x + 6, y - 16 + bob, 12, 12);
+                    ctx.strokeStyle = '#334155';
+                    ctx.strokeRect(x + 6, y - 16 + bob, 12, 12);
+                    ctx.fillStyle = '#eab308';
+                    ctx.font = 'bold 9px monospace';
+                    ctx.fillText('!', x + 10, y - 6 + bob);
+                }
+            });
+        }
+
+        function gameLoop() {
+            updatePlayerMovement();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            renderMap();
+            drawNPCSprites();
+            drawPlayerSprite();
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.onload = () => {
+            requestAnimationFrame(gameLoop);
+        };
+    </script>
+</body>
+</html>
